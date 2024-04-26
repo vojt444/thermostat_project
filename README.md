@@ -1,4 +1,4 @@
-# ATmega328p thermostat project
+# ATmega328p thermostat
 Brno University of Technology, FEEC, MPC-POR project
 
 Thermostat project with ATmega328p
