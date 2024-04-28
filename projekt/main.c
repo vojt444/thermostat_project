@@ -76,9 +76,9 @@ int main(void)
 	uint8_t set_date_index = 0;
 	char set_time_string[3][10] = {"Sekundy", "Minuty", "Hodiny"};
 	char set_date_string[3][10] = {"Den", "Mesic", "Rok"};
-	char mode_string[4][16] = {"Top:ON Chla:ON ", "Top:OFF Chla:ON", "Top:ON Chla:OFF", "Top:OFF Chla:OF"};
+	char mode_string[4][20] = {"Top:ON  Chla:ON  ", "Top:OFF Chla:ON ", "Top:ON  Chla:OFF ", "Top:OFF Chla:OFF"};
 	char heating_cooling_indicator = ' ';
-	const uint8_t buffer_empty[16] = "                ";
+	//char empty_buffer[16] = "                ";
 	uint8_t uart_buffer[UART_BUFFER_SIZE] = {0};
 	uint8_t uart_start_byte = 0;
 	uint8_t uart_command_byte = 0;
@@ -106,55 +106,78 @@ int main(void)
 					switch(uart_command_byte)
 					{
 						case 'T':
+							fprintf(&uart_out, "%s\n", "Nastavte pozadovanou teplotu ve formatu +/-XX.X");
 							for(uint8_t i = 0; i < 5; i++)
 								uart_buffer[i] = USART_Receive();
-							tmp_float = (float)atof((char*)uart_buffer);
-							req_temp = tmp_float;
-							fprintf(&uart_out, "Pozadovana teplota nastavena na: %.1f C\r\n", req_temp);
+							req_temp = (float)atof((char*)uart_buffer);
+							fprintf(&uart_out, "Pozadovana teplota nastavena na: %.1f C\n", req_temp);
 							break;
 						case 'H':
+							fprintf(&uart_out, "%s\n", "Nastavte hysterezi ve formatu X.X");
 							for(uint8_t i = 0; i < 3; i++)
 								uart_buffer[i] = USART_Receive();
 							tmp_float = (float)atof((char*)uart_buffer);
 							hysteresis = (tmp_float <= MAX_HYSTERESIS && tmp_float >= MIN_HYSTERESIS) ? (tmp_float) : hysteresis;
 							EEPROM_write_float(HYST_ADDRESS, &hysteresis);
-							fprintf(&uart_out, "Hystereze nastavena na: %.1f C\r\n", hysteresis);
+							fprintf(&uart_out, "Hystereze nastavena na: %.1f C\n", hysteresis);
 							break;
 						case 'K':
+							fprintf(&uart_out, "%s\n", "Nastavte kalibraci ve formatu +/-X.X");
 							for(uint8_t i = 0; i < 4; i++)
 								uart_buffer[i] = USART_Receive();
 							tmp_float = (float)atof((char*)uart_buffer);
 							calibration = (tmp_float <= MAX_CALIBRATION && tmp_float >= -MAX_CALIBRATION) ? (tmp_float) : calibration;
 							EEPROM_write_float(CALIB_ADDRESS, &calibration);
-							fprintf(&uart_out, "Kalibrace nastavena na: %.1f C\r\n", calibration);
+							fprintf(&uart_out, "Kalibrace nastavena na: %.1f C\n", calibration);
 							break;
 						case 'D':
+							fprintf(&uart_out, "%s\n", "Nastavte datum ve formatu DD.MM.RR");
 							for(uint8_t i = 0; i < 8; i++)
+							{
 								uart_buffer[i] = USART_Receive();
+								uart_buffer[i] = (uart_buffer[i] >= '0' && uart_buffer[i] <= '9') ? (uart_buffer[i]) : ('0');
+							}
 							buffer_set_date[0] = ((uart_buffer[0] - '0') << 4) | (uart_buffer[1] - '0');
 							buffer_set_date[1] = ((uart_buffer[3] - '0') << 4) | (uart_buffer[4] - '0');
 							buffer_set_date[2] = ((uart_buffer[6] - '0') << 4) | (uart_buffer[7] - '0');
+							if(buffer_set_date[0] > 0x31)
+								buffer_set_date[0] = 0x31;
+							else if(buffer_set_date[0] < 0x01)
+								buffer_set_date[0] = 0x01;
+								
+							if(buffer_set_date[1] > 0x12)
+								buffer_set_date[1] = 0x12;
+							else if(buffer_set_date[1] < 0x01)
+								buffer_set_date[1] = 0x01;
 							RTC_set_date(buffer_set_date);
 							EEPROM_write_data(DATE_ADDRESS, buffer_set_date, sizeof(buffer_set_date));
-							fprintf(&uart_out, "Datum nastaven na: %x.%x.%x\r\n", buffer_set_date[0], buffer_set_date[1], buffer_set_date[2]);
+							fprintf(&uart_out, "Datum nastaven na: %02x.%02x.%02x\n", buffer_set_date[0], buffer_set_date[1], buffer_set_date[2]);
 							break;
 						case 'C':
+							fprintf(&uart_out, "%s\n", "Nastavte cas ve formatu HH:MM:SS");
 							for(uint8_t i = 0; i < 8; i++)
+							{
 								uart_buffer[i] = USART_Receive();
+								uart_buffer[i] = (uart_buffer[i] >= '0' && uart_buffer[i] <= '9') ? (uart_buffer[i]) : ('0');
+							}
 							buffer_set_time[2] = ((uart_buffer[0] - '0') << 4) | (uart_buffer[1] - '0');
 							buffer_set_time[1] = ((uart_buffer[3] - '0') << 4) | (uart_buffer[4] - '0');
 							buffer_set_time[0] = ((uart_buffer[6] - '0') << 4) | (uart_buffer[7] - '0');
+							buffer_set_time[2] = (buffer_set_time[2] > 0x23) ? (buffer_set_time[2] = 0x23) : (buffer_set_time[2]);
+							buffer_set_time[1] = (buffer_set_time[1] > 0x59) ? (buffer_set_time[1] = 0x59) : (buffer_set_time[1]);
+							buffer_set_time[0] = (buffer_set_time[0] > 0x59) ? (buffer_set_time[0] = 0x59) : (buffer_set_time[0]);
 							RTC_set_time(buffer_set_time);
 							EEPROM_write_data(TIME_ADDRESS, buffer_set_time, sizeof(buffer_set_time));
-							fprintf(&uart_out, "Datum nastaven na: %x:%x:%x\r\n", buffer_set_time[2], buffer_set_time[1], buffer_set_time[0]);
+							fprintf(&uart_out, "Cas nastaven na: %02x:%02x:%02x\n", buffer_set_time[2], buffer_set_time[1], buffer_set_time[0]);
 							break;
 						case 'M':
+							fprintf(&uart_out, "%s\n", "Nastavte mod cislem 0-3");
 							uart_buffer[0] = USART_Receive() - '0';
 							mode = (uart_buffer[0] <= 3 && uart_buffer[0] >= 0) ? (uart_buffer[0]) : mode;
-							fprintf(&uart_out, "Mod nastaven na: %d\r\n", mode);
+							fprintf(&uart_out, "Mod nastaven na: %d\n", mode);
 							break;
 						default:
-							fprintf(&uart_out, "%s\r\n", "Prikazovy byte je neplatny!");
+							fprintf(&uart_out, "%s\n", "Prikazovy byte je neplatny!");
 							break;
 					}
 					break;
@@ -165,34 +188,34 @@ int main(void)
 						case 'T':
 							uart_command_byte = USART_Receive();
 							if(uart_command_byte == 'A')
-								fprintf(&uart_out, "Aktualni teplota je: %.1f C\r\n", act_temp);
+								fprintf(&uart_out, "Aktualni teplota je: %.1f C\n", act_temp);
 							else if(uart_command_byte == 'P')
-								fprintf(&uart_out, "Pozadovana teplota je: %.1f C\r\n", req_temp);
+								fprintf(&uart_out, "Pozadovana teplota je: %.1f C\n", req_temp);
 							else
-								fprintf(&uart_out, "%s", "Prikazovy byte 2 je neplatny!\r\n");
+								fprintf(&uart_out, "%s", "Prikazovy byte 2 je neplatny!\n");
 							break;
 						case 'H':
-							fprintf(&uart_out, "Aktualni hystereze je: %.1f C\r\n", hysteresis);
+							fprintf(&uart_out, "Aktualni hystereze je: %.1f C\n", hysteresis);
 							break;
 						case 'K':
-							fprintf(&uart_out, "Aktualni kalibrace je: %.1f C\r\n", calibration);
+							fprintf(&uart_out, "Aktualni kalibrace je: %.1f C\n", calibration);
 							break;
 						case 'D':
-							fprintf(&uart_out, "Aktualni datum je: %x.%x.%x\r\n", buffer_get[4], buffer_get[5], buffer_get[6]);
+							fprintf(&uart_out, "Aktualni datum je: %02x.%02x.%02x\n", buffer_get[4], buffer_get[5], buffer_get[6]);
 							break;
 						case 'C':
-							fprintf(&uart_out, "Aktualni cas je: %x:%x:%x\r\n", buffer_get[2], buffer_get[1], buffer_get[0]);
+							fprintf(&uart_out, "Aktualni cas je: %02x:%02x:%02x\n", buffer_get[2], buffer_get[1], buffer_get[0]);
 							break;
 						case 'M':
-							fprintf(&uart_out, "Aktualni mod je: %d\r\n", mode);
+							fprintf(&uart_out, "Aktualni mod je: %d\n", mode);
 							break;
 						default:
-							fprintf(&uart_out, "%s\r\n", "Prikazovy byte je neplatny!");
+							fprintf(&uart_out, "%s\n", "Prikazovy byte je neplatny!");
 							break;
 					}
 					break;
 				default:
-					fprintf(&uart_out, "%s\r\n", "Start byte je neplatny!");
+					fprintf(&uart_out, "%s\n", "Start byte je neplatny!");
 					break;
 			}
 			uart_received = false;
@@ -251,6 +274,7 @@ int main(void)
 		{
 			case BUTTON_DOWN: 
 				menu_page = (menu_page < MAX_PAGE) ? (menu_page + 1) : menu_page;
+				LCD_clear();
 				switch(menu_page)
 				{
 					case DATE_PAGE:
@@ -265,6 +289,7 @@ int main(void)
 				break;
 			case BUTTON_UP:
 				menu_page = (menu_page > 1) ? (menu_page - 1) : menu_page;
+				LCD_clear();
 				switch(menu_page)
 				{
 					case DATE_PAGE:
@@ -422,32 +447,32 @@ int main(void)
 			case HYSTERESIS_PAGE:
 				LCD_set_cursor(0,0);
 				fprintf(&lcd_out, "Hystereze:%.1fﬂC ", hysteresis);
-				LCD_set_cursor(1,0);
-				fprintf(&lcd_out, "%s", buffer_empty);
+				//LCD_set_cursor(1,0);
+				//fprintf(&lcd_out, "%s ", empty_buffer);
 				break;
 			case CALIBRATION_PAGE:
 				LCD_set_cursor(0,0);
 				fprintf(&lcd_out, "Kalibrace:%.1fﬂC ", calibration);
-				LCD_set_cursor(1,0);
-				fprintf(&lcd_out, "%s", buffer_empty);
+				//LCD_set_cursor(1,0);
+				//fprintf(&lcd_out, "%s ", empty_buffer);
 				break;
 			case DATE_PAGE:
 				LCD_set_cursor(0,0);
-				fprintf(&lcd_out, "Datum - %s     ", set_date_string[set_date_index]);
+				fprintf(&lcd_out, "Datum - %s    ", set_date_string[set_date_index]);
 				LCD_set_cursor(1,0);
-				fprintf(&lcd_out, "%02x.%02x.%02x        ", buffer_set_date[0], buffer_set_date[1], buffer_set_date[2]);
+				fprintf(&lcd_out, "%02x.%02x.%02x", buffer_set_date[0], buffer_set_date[1], buffer_set_date[2]);
 				break;
 			case TIME_PAGE:
 				LCD_set_cursor(0,0);
-				fprintf(&lcd_out, "Cas - %s    ", set_time_string[set_time_index]);
+				fprintf(&lcd_out, "Cas - %s  ", set_time_string[set_time_index]);
 				LCD_set_cursor(1,0);
-				fprintf(&lcd_out, "%02x:%02x:%02x        ", buffer_set_time[2], buffer_set_time[1], buffer_set_time[0]);
+				fprintf(&lcd_out, "%02x:%02x:%02x", buffer_set_time[2], buffer_set_time[1], buffer_set_time[0]);
 				break;
 			case MODE_PAGE:
 				LCD_set_cursor(0,0);
-				fprintf(&lcd_out, "%s   ", "Mod           ");
+				fprintf(&lcd_out, "%s:", "Mod");
 				LCD_set_cursor(1,0);
-				fprintf(&lcd_out, "%s  ", mode_string[mode]);
+				fprintf(&lcd_out, "%s ", mode_string[mode]);
 				break;
 			default:
 				break;

@@ -30,22 +30,6 @@ uint8_t USART_Receive(void)
 	return UDR0; 
 }
 
-void USART_Receive_buffer(uint8_t *buffer)
-{
-	uint8_t i = 0;
-	
-	while(1)
-	{
-		buffer[i] = USART_Receive();
-		if(buffer[i] == '#');
-			break;
-			
-		if(i == UART_BUFFER_SIZE)
-			break;
-		i++;
-	}
-}
-
 void uart_putchar(char c, FILE *stream)
 {
 	if(c == '\n')
